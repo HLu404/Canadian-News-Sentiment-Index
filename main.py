@@ -2,11 +2,14 @@ import requests
 import time
 import torch
 import os
+import sqlite3
 from datetime import date, timedelta
 from transformers import pipeline
 from dotenv import load_dotenv
 
 max_articles = 200 # set max # of articles to 200 
+end_program = False # if error code 429 (no calls left)
+offset = 0 # current page
 list_of_provinces = [
     'Yukon', 'Northwest Territories', 'Nunavut', 'Quebec', 'Ontario', 
     'Manitoba', 'Saskatchewan', 'Alberta', 'British Columbia']
@@ -41,10 +44,10 @@ articles = {} # contains article title (key) mapped to topics, score, respective
 # load api key 
 load_dotenv()
 sentiment_pipeline = pipeline("sentiment-analysis")
-
-for offset in range(0, max_articles, 10):
+count_before = 0
+while (len(articles) <= max_articles) and (len(articles) != count_before) and (not end_program):
+    count_before = len(articles) # check if number of articles is different 
     for topic in list_of_topics:
-        # list news articles from publishers in Canada 
         response = requests.get("https://api.freenewsapi.io/v1/news", 
                                 headers={"x-api-key": os.getenv("NEWS_API_KEY")},
                                 params={"language": "en", 
@@ -52,35 +55,81 @@ for offset in range(0, max_articles, 10):
                                         "published_after":str(date.today() - timedelta(days = 1))+"T00:00:00Z",
                                         "offset":offset, 
                                         "topic":topic})
-        # set a few parameters: language is english, 
-        #   articles only yesterday or today (to prevent too little articles at 00:00 hour)
-        data = response.json()['data']
+        if (response.status_code == 200):
+            article_list = response.json()
+            data = article_list['data']
+            for article in data:
+                # get the title and the body to scan province keywords.
+                article_province = ""
 
-        for article in data:
-            # get only the title from each article
-            #   get title, scan title, check for province keyword
-            article_name = ""
-            for key in city_to_province:
-                if key in article['title'].lower():
-                    article_name = city_to_province[key]
+                # request for article info 
+                time.sleep(0.5)
+                response = requests.get("https://api.freenewsapi.io/v1/details",
+                                        headers={"x-api-key": os.getenv("NEWS_API_KEY")},
+                                        params={"uuid": article['uuid']})
+                if (response.status_code == 429): # only possible error is running out of api calls
+                    end_program = True
                     break
 
-            # if no keyword, check article body, then check for keyword
-            if not article_name: 
-                time.sleep(0.5)
-                body = requests.get("https://api.freenewsapi.io/v1/details",
-                                    headers={"x-api-key": os.getenv("NEWS_API_KEY")},
-                                    params={"uuid": article['uuid']}).json()['data']['body']
+                article_info = response.json()['data']
+                # check if province name is in the title of the article 
+                article_title_lower = article['title'].lower()
                 for key in city_to_province:
-                    if key in body.lower():
-                        article_name = city_to_province[key]
+                    if key in article_title_lower:
+                        article_province = city_to_province[key]
                         break
-                        
-            # if still no province keyword, default to National.
-            if not article_name:
-                article_name = "National" 
-            
-            score_output = sentiment_pipeline(article['title'])
-            score = topic_weights[topic] * score_output[0]['score'] * (0.75 if score_output[0]['label'] == 'POSITIVE' else 1.25)
-            articles[article['title']] = [topic, score, article_name]
-        time.sleep(0.5) # as 2 calls per second
+
+                # if no keyword, check article body, then check for keyword
+                if not article_province:
+                    body_lower = (article_info['body'] or '').lower()
+                    for key in city_to_province:
+                        if key in body_lower:
+                            article_province = city_to_province[key]
+                            break
+                            
+                # if still no province keyword, default to National.
+                if not article_province:
+                    article_province = "National" 
+
+                # get sentiment analysis score of article
+                score_output = sentiment_pipeline(article['title'])
+                score = topic_weights[topic] * score_output[0]['score'] * (0.75 if score_output[0]['label'] == 'POSITIVE' else 1.25)
+
+                # add all to dictionary
+                articles[article['title']] = [
+                    article['title'], topic, article["publisher"], 
+                    article["published_at"], score, article_province, 
+                    article_info['thumbnail'], article_info['original_url']]
+            time.sleep(0.5) # as 2 calls per second
+            offset += 10
+        elif (response.status_code == 429):
+            end_program = True
+            break
+        else:
+            time.sleep(0.5)
+    
+        
+
+# establish connection to db
+conn = sqlite3.connect('article_list.db')
+cursor = conn.cursor()
+
+# create table 
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS articles (
+    Name TEXT, 
+    Topic TEXT, 
+    Publisher TEXT,
+    Date TEXT,
+    SCORE REAL,
+    Province TEXT,
+    Thumbnail TEXT,
+    URL TEXT UNIQUE
+    )""")
+
+# insert into db
+for row in articles.values():
+    cursor.execute("""INSERT OR IGNORE INTO articles (Name, Topic, Publisher, Date, Score, Province, Thumbnail, URL) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   tuple(row))
+conn.commit()
+conn.close()
