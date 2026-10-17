@@ -19,7 +19,8 @@ def get_daily_articles():
     conn = sqlite3.connect('article_list.db')
     # get rows from article database, turn it into a dictionary and return
     conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM articles WHERE Date >= ? ", (str(date.today() - timedelta(days = 1))+"T00:00:00Z"), ).fetchall()
+    rows = conn.execute("SELECT * FROM articles WHERE Date >= ? ", ((str(date.today() - timedelta(days = 1))+"T00:00:00Z"), )).fetchall()
     data = [dict(r) for r in rows]
     conn.close()
     return data
+

@@ -7,9 +7,8 @@ from datetime import date, timedelta
 from transformers import pipeline
 from dotenv import load_dotenv
 
-max_articles = 200 # set max # of articles to 200 
+max_articles = 10 # set max # of articles to 200 
 end_program = False # if error code 429 (no calls left)
-offset = 0 # current page
 list_of_provinces = [
     'Yukon', 'Northwest Territories', 'Nunavut', 'Quebec', 'Ontario', 
     'Manitoba', 'Saskatchewan', 'Alberta', 'British Columbia']
@@ -36,6 +35,7 @@ city_to_province = {
 list_of_topics = [
     'politics', 'technology', 'gaming', 'economy', 'education', 
     'celebrities', 'business', 'environment', 'sports']
+offset = {topic: 0 for topic in list_of_topics} 
 topic_weights = {
     'politics': 8, 'technology': 5, 'gaming': 3, 'economy': 7, 
     'education': 5, 'celebrities': 3, 'business': 6, 'environment': 5, 'sports': 3}
@@ -44,8 +44,8 @@ articles = {} # contains article title (key) mapped to topics, score, respective
 # load api key 
 load_dotenv()
 sentiment_pipeline = pipeline("sentiment-analysis")
-count_before = 0
-while (len(articles) <= max_articles) and (len(articles) != count_before) and (not end_program):
+count_before = -1
+while (len(articles) < max_articles) and (len(articles) != count_before) and (not end_program):
     count_before = len(articles) # check if number of articles is different 
     for topic in list_of_topics:
         response = requests.get("https://api.freenewsapi.io/v1/news", 
@@ -53,7 +53,7 @@ while (len(articles) <= max_articles) and (len(articles) != count_before) and (n
                                 params={"language": "en", 
                                         "country":"ca",
                                         "published_after":str(date.today() - timedelta(days = 1))+"T00:00:00Z",
-                                        "offset":offset, 
+                                        "offset":offset[topic], 
                                         "topic":topic})
         if (response.status_code == 200):
             article_list = response.json()
@@ -101,14 +101,16 @@ while (len(articles) <= max_articles) and (len(articles) != count_before) and (n
                     article["published_at"], score, article_province, 
                     article_info['thumbnail'], article_info['original_url']]
             time.sleep(0.5) # as 2 calls per second
-            offset += 10
+            offset[topic] += 10
         elif (response.status_code == 429):
+            rint(topic, response.status_code, response.text)
             end_program = True
             break
         else:
+            print(topic, response.status_code, response.text)
             time.sleep(0.5)
     
-        
+print(len(articles))
 
 # establish connection to db
 conn = sqlite3.connect('article_list.db')
