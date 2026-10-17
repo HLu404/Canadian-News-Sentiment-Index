@@ -6,7 +6,7 @@ Stress levels in Canadian news, shown on a map of Canada.
 
 ## What it does
 
-A Python script collects recent English-language articles from Canadian publishers and scores each headline with a pretrained sentiment model. The score is weighted by topic, so a negative story about politics counts for more than a negative story about sports. Each article ends up with a stress rating from 0 (calm) to 10 (high). Articles are placed on the map by province, colored from green to red, and stored in a database so the history builds up over time. A React page shows the map, an average gauge, and the most stressful headlines for each time window.
+A Python script collects recent English-language articles from Canadian publishers and scores each headline with a pretrained sentiment model. The score is weighted by topic, so a negative story about politics counts for more than a negative story about sports. Each article ends up with a stress rating from 0 (calm) to 10 (high). Articles are placed on the map by province as dots, colored from green to red, and stored in a database so the history builds up over time. A React page shows the map, an average gauge, and the most stressful headlines for each time window.
 
 ## Screenshots
 Main View:
