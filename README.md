@@ -10,13 +10,13 @@ A Python script collects recent English-language articles from Canadian publishe
 
 ## Screenshots
 Main View:
-<img width="1469" height="810" alt="image" src="https://github.com/user-attachments/assets/c16a0e24-7d88-4faa-a2de-23675224b77c" />
+<img width="1457" height="800" alt="image" src="https://github.com/user-attachments/assets/02c3e12d-7c78-4dd2-b355-02c9899b75a1" />
 
-Selected Article: 
-<img width="1467" height="795" alt="image" src="https://github.com/user-attachments/assets/70a72297-1613-4d48-ac28-f3b82b0f7809" />
+Selected Article and Today Tab: 
+<img width="1458" height="804" alt="image" src="https://github.com/user-attachments/assets/5fe64ebc-7a5d-458f-a6ff-572cfafb5d86" />
 
 About Tab: 
-<img width="1468" height="796" alt="image" src="https://github.com/user-attachments/assets/b4456263-d6e8-4103-ad3b-42564955d151" />
+<img width="1461" height="801" alt="image" src="https://github.com/user-attachments/assets/72160712-0d36-45c8-b1dd-1d221a050593" />
 
 ## How it works
 
