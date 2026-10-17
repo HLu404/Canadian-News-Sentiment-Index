@@ -10,9 +10,11 @@ A Python script collects recent English-language articles from Canadian publishe
 
 ## Screenshots
 
-![Main view](docs/screenshot-main.png)
-![Selected article](docs/screenshot-article.png)
-![About tab](docs/screenshot-about.png)
+![Main view](<img width="1469" height="810" alt="image" src="https://github.com/user-attachments/assets/c16a0e24-7d88-4faa-a2de-23675224b77c" />)
+![Selected article](<img width="1467" height="795" alt="image" src="https://github.com/user-attachments/assets/70a72297-1613-4d48-ac28-f3b82b0f7809" />
+)
+![About tab](<img width="1468" height="796" alt="image" src="https://github.com/user-attachments/assets/b4456263-d6e8-4103-ad3b-42564955d151" />
+)
 
 ## How it works
 
