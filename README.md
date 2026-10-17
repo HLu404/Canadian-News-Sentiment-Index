@@ -9,12 +9,14 @@ Stress levels in Canadian news, shown on a map of Canada.
 A Python script collects recent English-language articles from Canadian publishers and scores each headline with a pretrained sentiment model. The score is weighted by topic, so a negative story about politics counts for more than a negative story about sports. Each article ends up with a stress rating from 0 (calm) to 10 (high). Articles are placed on the map by province, colored from green to red, and stored in a database so the history builds up over time. A React page shows the map, an average gauge, and the most stressful headlines for each time window.
 
 ## Screenshots
+Main View:
+<img width="1469" height="810" alt="image" src="https://github.com/user-attachments/assets/c16a0e24-7d88-4faa-a2de-23675224b77c" />
 
-![Main view](<img width="1469" height="810" alt="image" src="https://github.com/user-attachments/assets/c16a0e24-7d88-4faa-a2de-23675224b77c" />)
-![Selected article](<img width="1467" height="795" alt="image" src="https://github.com/user-attachments/assets/70a72297-1613-4d48-ac28-f3b82b0f7809" />
-)
-![About tab](<img width="1468" height="796" alt="image" src="https://github.com/user-attachments/assets/b4456263-d6e8-4103-ad3b-42564955d151" />
-)
+Selected Article: 
+<img width="1467" height="795" alt="image" src="https://github.com/user-attachments/assets/70a72297-1613-4d48-ac28-f3b82b0f7809" />
+
+About Tab: 
+<img width="1468" height="796" alt="image" src="https://github.com/user-attachments/assets/b4456263-d6e8-4103-ad3b-42564955d151" />
 
 ## How it works
 
