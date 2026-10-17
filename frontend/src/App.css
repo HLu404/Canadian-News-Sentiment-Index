@@ -1,11 +1,13 @@
 :root {
-  --bg: #505050;
-  --panel: #383838;
-  --card: #444444;
-  --line: #5c5c5c;
-  --text: #d6d6d6;
-  --muted: #9a9a9a;
-  --strong: #f0f0f0;
+  --bg: #efe6d2;
+  --panel: #efe6d2;
+  --card: #f7f1e3;
+  --line: #d8cbae;
+  --text: #3a2a22;
+  --muted: #7a6a58;
+  --strong: #2b1d17;
+  --accent: #a12521;
+  --ring: 0 0 0 1px rgba(30, 18, 10, 0.6), 0 0 0 2px rgba(255, 245, 230, 0.45);
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -17,6 +19,29 @@ body {
   font-size: 15px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- animation ---------- */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* skip motion for people who have turned animations off in their system settings */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ---------- page layout ---------- */
@@ -49,6 +74,12 @@ body {
   color: var(--strong);
 }
 
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 /* ---------- map (no padding here: dot positions are % of this box) ---------- */
 
 .map {
@@ -67,17 +98,25 @@ body {
 
 .dot {
   position: absolute;
-  width: 9px;
-  height: 9px;
+  width: var(--size, 1.1%); /* set per dot in App.jsx, as a % of the map width */
+  aspect-ratio: 1;
   padding: 0;
   border: none;
   border-radius: 50%;
   background: var(--c);
   opacity: 1;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--ring);
   transform: translate(-50%, -50%);
   cursor: pointer;
-  transition: transform 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+}
+
+/* invisible extra click area, so small dots are still easy to hit */
+.dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
 }
 
 .dot:hover {
@@ -85,8 +124,12 @@ body {
   z-index: 1;
 }
 
+.dot:active {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
 .dot.selected {
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 0 3px #fff;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--strong);
   z-index: 2;
 }
 
@@ -102,6 +145,7 @@ body {
   border: none;
   border-left: 1px solid var(--line);
   background: var(--panel);
+  color: var(--text);
 }
 
 .tabs {
@@ -122,15 +166,25 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .tab:hover {
   color: var(--text);
 }
 
+.tab:active {
+  transform: scale(0.96);
+}
+
 .tab.active {
-  color: var(--strong);
-  border-bottom-color: var(--strong);
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* the About tab sits at the right end of the row, away from the data tabs */
+.tab.info {
+  margin-left: auto;
 }
 
 .panel-body {
@@ -141,6 +195,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  animation: fadeIn 0.18s ease-out;
 }
 
 /* ---------- cards ---------- */
@@ -151,6 +206,7 @@ body {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(60, 35, 15, 0.08);
 }
 
 .card h2 {
@@ -182,10 +238,22 @@ body {
 }
 
 .error {
-  color: #e07a6f;
+  color: var(--accent);
+}
+
+/* about text */
+.about {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text);
 }
 
 /* ---------- selected article card ---------- */
+
+.article-card {
+  animation: fadeIn 0.18s ease-out;
+}
 
 .thumb {
   display: block;
@@ -208,6 +276,7 @@ body {
 }
 
 .article-card h3 a:hover {
+  color: var(--accent);
   text-decoration: underline;
 }
 
@@ -239,11 +308,19 @@ body {
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
-.article-list button:hover,
+.article-list button:hover {
+  background: rgba(43, 29, 23, 0.06);
+}
+
 .article-list button.selected {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(161, 37, 33, 0.1);
+}
+
+.article-list button:active {
+  transform: scale(0.98);
 }
 
 .swatch {
@@ -251,6 +328,7 @@ body {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(30, 18, 10, 0.45);
 }
 
 .list-title {
@@ -291,6 +369,12 @@ body {
   letter-spacing: 0.18em;
 }
 
+/* darken the LOW / MEDIUM / HIGH words so yellow stays readable on beige */
+.gauge-level,
+.scorebar-top > span {
+  filter: brightness(0.75);
+}
+
 .gauge-foot {
   display: flex;
   justify-content: space-between;
@@ -303,11 +387,11 @@ body {
 }
 
 .gauge-foot span:first-child {
-  color: hsl(120, 55%, 48%);
+  color: #3f8a35;
 }
 
 .gauge-foot span:last-child {
-  color: hsl(0, 55%, 48%);
+  color: #b32219;
 }
 
 .gauge-foot strong {
@@ -345,15 +429,8 @@ body {
   position: relative;
   height: 10px;
   border-radius: 5px;
-  /* same colors as the dots: green at 0, red at 10 */
-  background: linear-gradient(
-    to right,
-    hsl(120, 55%, 48%),
-    hsl(90, 55%, 48%),
-    hsl(60, 55%, 48%),
-    hsl(30, 55%, 48%),
-    hsl(0, 55%, 48%)
-  );
+  /* same five colors as the dots, evenly spaced: green to red */
+  background: linear-gradient(to right, #60b454, #8fbe57, #fabe32, #e86c24, #e0392f);
 }
 
 .scorebar-marker {
@@ -363,7 +440,7 @@ body {
   height: 18px;
   border-radius: 2px;
   background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 1.5px var(--strong);
   transform: translateX(-50%);
 }
 

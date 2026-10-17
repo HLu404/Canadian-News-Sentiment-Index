@@ -7,7 +7,12 @@ from datetime import date, timedelta
 from transformers import pipeline
 from dotenv import load_dotenv
 
-max_articles = 10 # set max # of articles to 200 
+# the database and .env live next to this file, so the script and the API
+# always use the same database, wherever the command is run from
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "article_list.db")
+
+max_articles = 10000 # set max # of articles to 200 (10 is the test value)
 end_program = False # if error code 429 (no calls left)
 list_of_provinces = [
     'Yukon', 'Northwest Territories', 'Nunavut', 'Quebec', 'Ontario', 
@@ -35,19 +40,23 @@ city_to_province = {
 list_of_topics = [
     'politics', 'technology', 'gaming', 'economy', 'education', 
     'celebrities', 'business', 'environment', 'sports']
-offset = {topic: 0 for topic in list_of_topics} 
+offset = {topic: 0 for topic in list_of_topics} # each topic has its own page counter
 topic_weights = {
     'politics': 8, 'technology': 5, 'gaming': 3, 'economy': 7, 
     'education': 5, 'celebrities': 3, 'business': 6, 'environment': 5, 'sports': 3}
 articles = {} # contains article title (key) mapped to topics, score, respectively
 
-# load api key 
-load_dotenv()
+# load api key from the .env file next to this script
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 sentiment_pipeline = pipeline("sentiment-analysis")
+
 count_before = -1
 while (len(articles) < max_articles) and (len(articles) != count_before) and (not end_program):
     count_before = len(articles) # check if number of articles is different 
     for topic in list_of_topics:
+        if end_program: # stop sending requests once the quota is gone
+            break
+
         response = requests.get("https://api.freenewsapi.io/v1/news", 
                                 headers={"x-api-key": os.getenv("NEWS_API_KEY")},
                                 params={"language": "en", 
@@ -56,22 +65,24 @@ while (len(articles) < max_articles) and (len(articles) != count_before) and (no
                                         "offset":offset[topic], 
                                         "topic":topic})
         if (response.status_code == 200):
-            article_list = response.json()
-            data = article_list['data']
+            data = response.json().get('data', [])
             for article in data:
                 # get the title and the body to scan province keywords.
                 article_province = ""
 
                 # request for article info 
                 time.sleep(0.5)
-                response = requests.get("https://api.freenewsapi.io/v1/details",
-                                        headers={"x-api-key": os.getenv("NEWS_API_KEY")},
-                                        params={"uuid": article['uuid']})
-                if (response.status_code == 429): # only possible error is running out of api calls
+                detail_response = requests.get("https://api.freenewsapi.io/v1/details",
+                                               headers={"x-api-key": os.getenv("NEWS_API_KEY")},
+                                               params={"uuid": article['uuid']})
+                if (detail_response.status_code == 429): # only possible error is running out of api calls
                     end_program = True
                     break
+                if (detail_response.status_code != 200): # skip this article on any other error
+                    continue
 
-                article_info = response.json()['data']
+                article_info = detail_response.json().get('data') or {}
+
                 # check if province name is in the title of the article 
                 article_title_lower = article['title'].lower()
                 for key in city_to_province:
@@ -81,7 +92,7 @@ while (len(articles) < max_articles) and (len(articles) != count_before) and (no
 
                 # if no keyword, check article body, then check for keyword
                 if not article_province:
-                    body_lower = (article_info['body'] or '').lower()
+                    body_lower = (article_info.get('body') or '').lower()
                     for key in city_to_province:
                         if key in body_lower:
                             article_province = city_to_province[key]
@@ -99,11 +110,11 @@ while (len(articles) < max_articles) and (len(articles) != count_before) and (no
                 articles[article['title']] = [
                     article['title'], topic, article["publisher"], 
                     article["published_at"], score, article_province, 
-                    article_info['thumbnail'], article_info['original_url']]
+                    article_info.get('thumbnail'), article_info.get('original_url')]
             time.sleep(0.5) # as 2 calls per second
             offset[topic] += 10
         elif (response.status_code == 429):
-            rint(topic, response.status_code, response.text)
+            print(topic, response.status_code, response.text)
             end_program = True
             break
         else:
@@ -113,7 +124,7 @@ while (len(articles) < max_articles) and (len(articles) != count_before) and (no
 print(len(articles))
 
 # establish connection to db
-conn = sqlite3.connect('article_list.db')
+conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
 # create table 

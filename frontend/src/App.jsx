@@ -22,21 +22,55 @@ const ANCHORS = {
 }
 
 const CANVAS_W = 1200 // resolution used to find each province's land
-const STEP = 16       // distance between dots, in canvas pixels
-const EDGE = 5        // how far dots stay from a border, in canvas pixels
 
+// dot spots come in three grids, coarse to fine: [spacing, border margin] in canvas pixels.
+// A province uses the coarsest grid that has room for all of its articles.
+const LEVELS = [[16, 5], [10, 3], [7, 1]]
+
+// dot sizes are a % of the map width (1.1% is about 9px on a typical window)
+const DOT_MAX = 1.1          // full size
+const DOT_MIN = 0.55         // smallest a dot gets (about 4.5px)
+const FULL_SIZE_COUNT = 10   // a province keeps full-size dots up to this many articles
+
+// the About tab only shows text, so its `days` just sets which dots stay on the map
 const TABS = [
   { id: 'national', label: 'National', days: 7 },
   { id: 'today', label: 'Today', days: 1 },
   { id: 'week', label: 'This week', days: 7 },
   { id: 'month', label: 'This month', days: 30 },
+  { id: 'about', label: 'About', days: 30 },
+]
+
+const ABOUT_TEXT =
+  'The Canadian News Index measures how stressful Canadian news is. A script collects ' +
+  'recent English-language articles from Canadian publishers and scores each headline ' +
+  'with a pretrained sentiment model. That score is weighted by topic, so a negative ' +
+  'story about politics or the economy counts for more than a negative story about ' +
+  'sports or gaming, and each article ends up with a stress rating from 0 (calm) to 10 ' +
+  '(high). Articles are placed on the map by province, based on the cities and provinces ' +
+  'named in their title or text, and articles that name no place are counted as ' +
+  'national. Each dot is colored from green to red by its score. The topic weights are ' +
+  'hand-picked, so treat the index as a rough, informal gauge of the news mood and not ' +
+  'a scientific measurement.'
+
+// score colors, evenly spaced from 0 to 10: green, yellow-green, yellow, orange, red
+const STOPS = [
+  [96, 180, 84],   // #60B454
+  [143, 190, 87],  // #8FBE57
+  [250, 190, 50],  // #FABE32
+  [232, 108, 36],  // #E86C24
+  [224, 57, 47],   // #E0392F
 ]
 
 /* ---------- helpers ---------- */
 
 function scoreToColor(score) {
   const t = Math.min(Math.max(score / 10, 0), 1)
-  return `hsl(${120 - t * 120}, 55%, 48%)` // muted green to red
+  const pos = t * (STOPS.length - 1)
+  const i = Math.min(Math.floor(pos), STOPS.length - 2)
+  const f = pos - i
+  const [r, g, b] = STOPS[i].map((v, k) => Math.round(v + (STOPS[i + 1][k] - v) * f))
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 // local midnight, going back (days - 1) days; days = 1 means "since midnight today"
@@ -63,8 +97,15 @@ function levelOf(score) {
   return 'HIGH'
 }
 
-// For each province, build a list of valid dot positions (as % of the map),
-// sorted from the anchor outward.
+// Dot size for one province, as a % of the map width.
+// It shrinks as the count grows, and never gets bigger than the gap between spots.
+function dotSize(count, spacing) {
+  const crowd = Math.sqrt(FULL_SIZE_COUNT / Math.max(count, FULL_SIZE_COUNT))
+  return Math.max(DOT_MIN, Math.min(DOT_MAX * crowd, spacing * 0.85))
+}
+
+// For each province, build up to three lists of valid dot positions (as % of the map),
+// each sorted from the anchor outward. Every list also records its spacing.
 function buildSlots(img) {
   const rect = img.getBoundingClientRect()
   const w = CANVAS_W
@@ -121,10 +162,9 @@ function buildSlots(img) {
     const region = floodFill(start[0], start[1])
     const inRegion = (x, y) => x >= 0 && y >= 0 && x < w && y < h && region[y * w + x] === 1
 
-    // small provinces get finer spacing if the first pass finds too few spots
-    let points = []
-    for (const [step, edge] of [[STEP, EDGE], [10, 3], [7, 1]]) {
-      points = []
+    const levels = []
+    for (const [step, edge] of LEVELS) {
+      const points = []
       for (let y = 0; y < h; y += step) {
         for (let x = 0; x < w; x += step) {
           if (
@@ -134,13 +174,17 @@ function buildSlots(img) {
           ) points.push([x, y])
         }
       }
-      if (points.length >= 8) break
-    }
+      if (points.length === 0) continue
 
-    points.sort((a, b) =>
-      Math.hypot(a[0] - start[0], a[1] - start[1]) -
-      Math.hypot(b[0] - start[0], b[1] - start[1]))
-    slots[province] = points.map(([x, y]) => [x / w * 100, y / h * 100])
+      points.sort((a, b) =>
+        Math.hypot(a[0] - start[0], a[1] - start[1]) -
+        Math.hypot(b[0] - start[0], b[1] - start[1]))
+      levels.push({
+        spacing: step / w * 100, // gap between spots, as a % of the map width
+        points: points.map(([x, y]) => [x / w * 100, y / h * 100]),
+      })
+    }
+    if (levels.length) slots[province] = levels
   }
   return slots
 }
@@ -185,8 +229,8 @@ function Gauge({ score }) {
           />
         ))}
         <line x1="100" y1="100" x2={tipX} y2={tipY}
-              stroke="#e6e6e6" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="100" cy="100" r="8" fill="#444" stroke="#e6e6e6" strokeWidth="3" />
+              stroke="#2b1d17" strokeWidth="4" strokeLinecap="round" />
+        <circle cx="100" cy="100" r="8" fill="#f7f1e3" stroke="#2b1d17" strokeWidth="3" />
       </svg>
       <div className="gauge-foot">
         <span>LOW</span>
@@ -225,7 +269,7 @@ function ScoreBar({ score }) {
 
 function App() {
   const [articles, setArticles] = useState([])
-  const [slots, setSlots] = useState(null)
+  const [layout, setLayout] = useState(null)
   const [selected, setSelected] = useState(null)
   const [tab, setTab] = useState('national')
   const [error, setError] = useState(null)
@@ -245,7 +289,7 @@ function App() {
 
   function handleMapLoad(e) {
     try {
-      setSlots(buildSlots(e.currentTarget))
+      setLayout(buildSlots(e.currentTarget))
     } catch (err) {
       console.error('Could not read the map image', err)
     }
@@ -265,37 +309,52 @@ function App() {
   const headlines = [...shown].sort((a, b) => b.SCORE - a.SCORE).slice(0, 20)
   const heading = tab === 'national' ? 'National articles' : `Canada · ${current.label}`
 
-  // next free spot in each province, newest articles first. If a province is
-  // full, the extra articles still count in the summary but get no dot.
+  // Group the articles by province, newest first. Each province picks the coarsest
+  // grid with room for all its articles and sizes its dots by how many it has.
+  // If even the finest grid is full, the oldest extras get no dot; they still
+  // count in the summary and the headline list.
   const dots = []
-  if (slots) {
-    const used = {}
+  if (layout) {
+    const groups = {}
     const sorted = [...onMap].sort(
       (a, b) => b.Date.localeCompare(a.Date) || a.URL.localeCompare(b.URL))
     for (const article of sorted) {
-      const list = slots[article.Province]
-      if (!list || list.length === 0) continue
-      const i = used[article.Province] || 0
-      if (i >= list.length) continue
-      used[article.Province] = i + 1
-      const [x, y] = list[i]
-      dots.push({ article, x, y })
+      if (!groups[article.Province]) groups[article.Province] = []
+      groups[article.Province].push(article)
+    }
+
+    for (const [province, list] of Object.entries(groups)) {
+      const levels = layout[province]
+      if (!levels) continue // no map spots for this province
+      const level = levels.find(l => l.points.length >= list.length) || levels[levels.length - 1]
+      const count = Math.min(list.length, level.points.length)
+      const size = dotSize(count, level.spacing)
+      list.slice(0, count).forEach((article, i) => {
+        const [x, y] = level.points[i]
+        dots.push({ article, x, y, size })
+      })
     }
   }
 
   return (
     <div className="webpage">
       <div className="header">
-        <h1>World Cortisol Index</h1>
+        <h1>Canadian News Index</h1>
+        <p className="subtitle">Stress Levels in Canadian News</p>
       </div>
 
       <div className="map">
         <img src={canadaMap} alt="Map of Canada" onLoad={handleMapLoad} />
-        {dots.map(({ article, x, y }) => (
+        {dots.map(({ article, x, y, size }) => (
           <button
             key={article.URL}
             className={selected?.URL === article.URL ? 'dot selected' : 'dot'}
-            style={{ left: `${x}%`, top: `${y}%`, '--c': scoreToColor(article.SCORE) }}
+            style={{
+              left: `${x}%`,
+              top: `${y}%`,
+              '--size': `${size}%`,
+              '--c': scoreToColor(article.SCORE),
+            }}
             onClick={() => setSelected(article)}
           />
         ))}
@@ -306,7 +365,9 @@ function App() {
           {TABS.map(t => (
             <button
               key={t.id}
-              className={t.id === tab ? 'tab active' : 'tab'}
+              className={
+                'tab' + (t.id === tab ? ' active' : '') + (t.id === 'about' ? ' info' : '')
+              }
               onClick={() => changeTab(t.id)}
             >
               {t.label}
@@ -314,20 +375,23 @@ function App() {
           ))}
         </div>
 
-        <div className="panel-body">
+        {/* key={tab} remounts this block when the tab changes, which replays the fade-in */}
+        <div className="panel-body" key={tab}>
           {error && <p className="error">Couldn't load articles: {error}</p>}
 
-          <section className="card">
-            <h2>{heading}</h2>
-            <Gauge score={mean(shown)} />
-            <p className="stats">
-              <b>{shown.length}</b> articles
-              {tab !== 'national' && <> · <b>{national.length}</b> national</>}
-            </p>
-          </section>
+          {tab !== 'about' && (
+            <section className="card">
+              <h2>{heading}</h2>
+              <Gauge score={mean(shown)} />
+              <p className="stats">
+                <b>{shown.length}</b> articles
+                {tab !== 'national' && <> · <b>{national.length}</b> national</>}
+              </p>
+            </section>
+          )}
 
           {selected && (
-            <section className="card article-card">
+            <section className="card article-card" key={selected.URL}>
               {selected.Thumbnail && (
                 <a href={selected.URL} target="_blank" rel="noreferrer">
                   <img
@@ -348,27 +412,34 @@ function App() {
             </section>
           )}
 
-          <section className="card">
-            <h2>Most stressful headlines</h2>
-            {headlines.length === 0 ? (
-              <p className="muted">No articles in this period yet.</p>
-            ) : (
-              <ul className="article-list">
-                {headlines.map(a => (
-                  <li key={a.URL}>
-                    <button
-                      className={selected?.URL === a.URL ? 'selected' : ''}
-                      onClick={() => setSelected(a)}
-                    >
-                      <span className="swatch" style={{ background: scoreToColor(a.SCORE) }} />
-                      <span className="list-title">{a.Name}</span>
-                      <span className="list-score">{a.SCORE.toFixed(1)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          {tab === 'about' ? (
+            <section className="card">
+              <h2>About this site</h2>
+              <p className="about">{ABOUT_TEXT}</p>
+            </section>
+          ) : (
+            <section className="card">
+              <h2>Most stressful headlines</h2>
+              {headlines.length === 0 ? (
+                <p className="muted">No articles in this period yet.</p>
+              ) : (
+                <ul className="article-list">
+                  {headlines.map(a => (
+                    <li key={a.URL}>
+                      <button
+                        className={selected?.URL === a.URL ? 'selected' : ''}
+                        onClick={() => setSelected(a)}
+                      >
+                        <span className="swatch" style={{ background: scoreToColor(a.SCORE) }} />
+                        <span className="list-title">{a.Name}</span>
+                        <span className="list-score">{a.SCORE.toFixed(1)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>
