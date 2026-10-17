@@ -21,7 +21,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---------- animation ---------- */
+/* animations */
 
 @keyframes fadeIn {
   from {
@@ -44,8 +44,7 @@ body {
   }
 }
 
-/* ---------- page layout ---------- */
-
+/* page layout settings */
 .webpage {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -80,8 +79,6 @@ body {
   color: var(--muted);
 }
 
-/* ---------- map (no padding here: dot positions are % of this box) ---------- */
-
 .map {
   grid-area: map;
   position: relative;
@@ -98,7 +95,7 @@ body {
 
 .dot {
   position: absolute;
-  width: var(--size, 1.1%); /* set per dot in App.jsx, as a % of the map width */
+  width: var(--size, 1.1%);
   aspect-ratio: 1;
   padding: 0;
   border: none;
@@ -133,7 +130,7 @@ body {
   z-index: 2;
 }
 
-/* ---------- side panel: tabs stay fixed, the body scrolls ---------- */
+/* side panel */
 
 .side-panel {
   grid-area: side-panel;
@@ -182,7 +179,6 @@ body {
   border-bottom-color: var(--accent);
 }
 
-/* the About tab sits at the right end of the row, away from the data tabs */
 .tab.info {
   margin-left: auto;
 }
@@ -197,8 +193,6 @@ body {
   gap: 14px;
   animation: fadeIn 0.18s ease-out;
 }
-
-/* ---------- cards ---------- */
 
 .card {
   flex-shrink: 0;
@@ -241,15 +235,12 @@ body {
   color: var(--accent);
 }
 
-/* about text */
 .about {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.65;
   color: var(--text);
 }
-
-/* ---------- selected article card ---------- */
 
 .article-card {
   animation: fadeIn 0.18s ease-out;
@@ -285,8 +276,6 @@ body {
   color: var(--muted);
   font-size: 0.8rem;
 }
-
-/* ---------- headline list ---------- */
 
 .article-list {
   margin: 0;
@@ -348,8 +337,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- gauge (tab average) ---------- */
-
 .gauge {
   width: 100%;
   max-width: 260px;
@@ -369,7 +356,6 @@ body {
   letter-spacing: 0.18em;
 }
 
-/* darken the LOW / MEDIUM / HIGH words so yellow stays readable on beige */
 .gauge-level,
 .scorebar-top > span {
   filter: brightness(0.75);
@@ -401,8 +387,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- score bar (single article) ---------- */
-
 .scorebar {
   margin-top: 4px;
 }
@@ -429,7 +413,6 @@ body {
   position: relative;
   height: 10px;
   border-radius: 5px;
-  /* same five colors as the dots, evenly spaced: green to red */
   background: linear-gradient(to right, #60b454, #8fbe57, #fabe32, #e86c24, #e0392f);
 }
 

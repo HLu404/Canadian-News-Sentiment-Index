@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import canadaMap from './assets/Canada_provinces-blank-map_XMLcomments-CSSclasses-SVGids_green.svg'
 
-// Anywhere INSIDE each province, as [x%, y%] of the map image.
-// Keys match what your script saves. If you calibrated these earlier,
-// paste your own numbers over these.
+// coordinate locations for provinces
 const ANCHORS = {
   'yukon': [7, 40],
   'northwest territories': [19, 43],
@@ -24,7 +22,6 @@ const ANCHORS = {
 const CANVAS_W = 1200 // resolution used to find each province's land
 
 // dot spots come in three grids, coarse to fine: [spacing, border margin] in canvas pixels.
-// A province uses the coarsest grid that has room for all of its articles.
 const LEVELS = [[16, 5], [10, 3], [7, 1]]
 
 // dot sizes are a % of the map width (1.1% is about 9px on a typical window)
@@ -32,7 +29,7 @@ const DOT_MAX = 1.1          // full size
 const DOT_MIN = 0.55         // smallest a dot gets (about 4.5px)
 const FULL_SIZE_COUNT = 10   // a province keeps full-size dots up to this many articles
 
-// the About tab only shows text, so its `days` just sets which dots stay on the map
+// the About tab only shows text, so its days just sets which dots stay on the map
 const TABS = [
   { id: 'national', label: 'National', days: 7 },
   { id: 'today', label: 'Today', days: 1 },
@@ -48,10 +45,11 @@ const ABOUT_TEXT =
   'story about politics or the economy counts for more than a negative story about ' +
   'sports or gaming, and each article ends up with a stress rating from 0 (calm) to 10 ' +
   '(high). Articles are placed on the map by province, based on the cities and provinces ' +
-  'named in their title or text, and articles that name no place are counted as ' +
-  'national. Each dot is colored from green to red by its score. The topic weights are ' +
-  'hand-picked, so treat the index as a rough, informal gauge of the news mood and not ' +
-  'a scientific measurement.'
+  'named in their title or text. Articles that name no place are counted as national, ' +
+  'and their dots are spread across the provinces at random, marked with a small light ' +
+  'center, so no province is left empty. Each dot is colored from green to red by its ' +
+  'score. The topic weights are hand-picked, so treat the index as a rough, informal ' +
+  'gauge of the news mood and not a scientific measurement.'
 
 // score colors, evenly spaced from 0 to 10: green, yellow-green, yellow, orange, red
 const STOPS = [
@@ -62,7 +60,7 @@ const STOPS = [
   [224, 57, 47],   // #E0392F
 ]
 
-/* ---------- helpers ---------- */
+/* helper functions */
 
 function scoreToColor(score) {
   const t = Math.min(Math.max(score / 10, 0), 1)
@@ -73,7 +71,6 @@ function scoreToColor(score) {
   return `rgb(${r}, ${g}, ${b})`
 }
 
-// local midnight, going back (days - 1) days; days = 1 means "since midnight today"
 function startOf(days) {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
@@ -97,15 +94,57 @@ function levelOf(score) {
   return 'HIGH'
 }
 
-// Dot size for one province, as a % of the map width.
-// It shrinks as the count grows, and never gets bigger than the gap between spots.
+// Small fixed "random" number from a string, so a national article always lands
+// in the same place instead of jumping around on every render.
+function hashStr(s) {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+// Hands each national article to a province. The articles go in a random order, and each
+// one goes to the province with the fewest dots so far (ties are broken randomly), so
+// every province ends up with some. A province that is already full is skipped.
+function spreadNational(nationals, groups, layout) {
+  const provinces = Object.keys(layout)
+  const counts = {}
+  const room = {}
+  for (const p of provinces) {
+    const finest = layout[p][layout[p].length - 1]
+    counts[p] = (groups[p] || []).length
+    room[p] = finest.points.length
+  }
+
+  const placed = []
+  const order = [...nationals].sort((a, b) => hashStr(a.URL) - hashStr(b.URL))
+  for (const article of order) {
+    let best = null
+    let bestScore = Infinity
+    for (const p of provinces) {
+      if (counts[p] >= room[p]) continue
+      const score = counts[p] + (hashStr(article.URL + p) % 1000) / 1000
+      if (score < bestScore) {
+        best = p
+        bestScore = score
+      }
+    }
+    if (!best) break // every province is full
+    counts[best] += 1
+    placed.push({ province: best, article })
+  }
+  return placed
+}
+
+// Dot size for one province, it shrinks as the count grows
 function dotSize(count, spacing) {
   const crowd = Math.sqrt(FULL_SIZE_COUNT / Math.max(count, FULL_SIZE_COUNT))
   return Math.max(DOT_MIN, Math.min(DOT_MAX * crowd, spacing * 0.85))
 }
 
-// For each province, build up to three lists of valid dot positions (as % of the map),
-// each sorted from the anchor outward. Every list also records its spacing.
+// For each province, build up to three lists of valid dot positions 
 function buildSlots(img) {
   const rect = img.getBoundingClientRect()
   const w = CANVAS_W
@@ -180,7 +219,7 @@ function buildSlots(img) {
         Math.hypot(a[0] - start[0], a[1] - start[1]) -
         Math.hypot(b[0] - start[0], b[1] - start[1]))
       levels.push({
-        spacing: step / w * 100, // gap between spots, as a % of the map width
+        spacing: step / w * 100,
         points: points.map(([x, y]) => [x / w * 100, y / h * 100]),
       })
     }
@@ -189,7 +228,7 @@ function buildSlots(img) {
   return slots
 }
 
-// SVG arc from one angle to another (180 = left end, 0 = right end)
+// SVG arc 
 function arcPath(cx, cy, r, fromDeg, toDeg) {
   const point = deg => {
     const a = deg * Math.PI / 180
@@ -202,7 +241,7 @@ function arcPath(cx, cy, r, fromDeg, toDeg) {
 
 const SEGMENTS = 5
 
-// semicircle meter, used for the average of the selected tab
+// semicircle meter
 function Gauge({ score }) {
   const valid = typeof score === 'number' && !Number.isNaN(score)
   const t = valid ? Math.min(Math.max(score / 10, 0), 1) : 0
@@ -265,8 +304,6 @@ function ScoreBar({ score }) {
   )
 }
 
-/* ---------- the page ---------- */
-
 function App() {
   const [articles, setArticles] = useState([])
   const [layout, setLayout] = useState(null)
@@ -309,29 +346,34 @@ function App() {
   const headlines = [...shown].sort((a, b) => b.SCORE - a.SCORE).slice(0, 20)
   const heading = tab === 'national' ? 'National articles' : `Canada · ${current.label}`
 
-  // Group the articles by province, newest first. Each province picks the coarsest
-  // grid with room for all its articles and sizes its dots by how many it has.
-  // If even the finest grid is full, the oldest extras get no dot; they still
-  // count in the summary and the headline list.
   const dots = []
   if (layout) {
     const groups = {}
-    const sorted = [...onMap].sort(
-      (a, b) => b.Date.localeCompare(a.Date) || a.URL.localeCompare(b.URL))
-    for (const article of sorted) {
-      if (!groups[article.Province]) groups[article.Province] = []
-      groups[article.Province].push(article)
+    const add = (province, article, spread) => {
+      if (!groups[province]) groups[province] = []
+      groups[province].push({ article, spread })
+    }
+    for (const a of onMap) add(a.Province, a, false)
+    for (const { province, article } of spreadNational(national, groups, layout)) {
+      add(province, article, true)
     }
 
     for (const [province, list] of Object.entries(groups)) {
       const levels = layout[province]
       if (!levels) continue // no map spots for this province
+
+      // newest articles first
+      list.sort(
+        (x, y) =>
+          y.article.Date.localeCompare(x.article.Date) ||
+          x.article.URL.localeCompare(y.article.URL))
+
       const level = levels.find(l => l.points.length >= list.length) || levels[levels.length - 1]
       const count = Math.min(list.length, level.points.length)
       const size = dotSize(count, level.spacing)
-      list.slice(0, count).forEach((article, i) => {
+      list.slice(0, count).forEach(({ article, spread }, i) => {
         const [x, y] = level.points[i]
-        dots.push({ article, x, y, size })
+        dots.push({ article, spread, x, y, size })
       })
     }
   }
@@ -345,10 +387,14 @@ function App() {
 
       <div className="map">
         <img src={canadaMap} alt="Map of Canada" onLoad={handleMapLoad} />
-        {dots.map(({ article, x, y, size }) => (
+        {dots.map(({ article, spread, x, y, size }) => (
           <button
             key={article.URL}
-            className={selected?.URL === article.URL ? 'dot selected' : 'dot'}
+            className={
+              'dot' +
+              (spread ? ' national' : '') +
+              (selected?.URL === article.URL ? ' selected' : '')
+            }
             style={{
               left: `${x}%`,
               top: `${y}%`,
@@ -408,6 +454,12 @@ function App() {
               <p className="meta">
                 {selected.Publisher} · {selected.Topic} · {prettyProvince(selected.Province)}
               </p>
+              {selected.Province === 'National' && (
+                <p className="note">
+                  National story, so its dot sits at a random spot on the map (marked with a
+                  light center).
+                </p>
+              )}
               <ScoreBar score={selected.SCORE} />
             </section>
           )}

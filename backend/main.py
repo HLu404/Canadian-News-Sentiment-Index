@@ -12,7 +12,7 @@ app = FastAPI()
 # allow main website to call API
 app.add_middleware(
     CORSMiddleware, 
-    allow_origins = "http://localhost:5173", # or whatever it is. FIX later 
+    allow_origins = "http://localhost:5173", 
     allow_credentials = True, 
     allow_methods = ["*"],
     allow_headers= ["*"])

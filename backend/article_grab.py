@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "article_list.db")
 
-max_articles = 10000 # set max # of articles to 200 (10 is the test value)
+max_articles = 10000 # set max # of articles 
 end_program = False # if error code 429 (no calls left)
 list_of_provinces = [
     'Yukon', 'Northwest Territories', 'Nunavut', 'Quebec', 'Ontario', 
@@ -46,7 +46,7 @@ topic_weights = {
     'education': 5, 'celebrities': 3, 'business': 6, 'environment': 5, 'sports': 3}
 articles = {} # contains article title (key) mapped to topics, score, respectively
 
-# load api key from the .env file next to this script
+# load api key from the .env file
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 sentiment_pipeline = pipeline("sentiment-analysis")
 
