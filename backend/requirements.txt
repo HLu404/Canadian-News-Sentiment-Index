@@ -1,0 +1,6 @@
+fastapi==0.141.1
+uvicorn==0.54.0
+requests==2.34.2
+python-dotenv==1.2.3
+transformers==5.17.0
+torch==2.12.0
